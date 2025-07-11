@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # --- 1. Define the Model ---
     # First, set up the parameters for the specific model you want to test.
     params = ModelParameters()
-    params.m_N = 0.1 # Example: testing a 0.5 GeV sterile neutrino
+    params.m_N = 0.2 # Example: testing a 0.5 GeV sterile neutrino
     
     # Define the path to the g* data file
     try:
@@ -75,8 +75,8 @@ if __name__ == "__main__":
     
     # Create the other particles involved in the decay
     e = Electron()
-    U = LightNeutrino('nu_e')
-    D = Tau() # Example decay to a muon
+    U = LightNeutrino('nu_mu')
+    D = Muon() # Example decay to a muon
     
     print(f"\nCalculating decay for a {sterile_neutrino.mass} GeV Sterile Neutrino.")
 

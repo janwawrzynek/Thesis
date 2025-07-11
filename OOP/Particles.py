@@ -53,11 +53,9 @@ class SterileNeutrino(Neutrino):
         return f"SterileNeutrino: {self.flavor}, Mass: {self.mass}"
 
     # --- Decay Calculation Methods ---
-    # These methods are now part of the particle's intrinsic definition.
-
     @staticmethod
     def lam(a, b, c):
-        """Källén function for kinematic calculations. Static as it's a pure function."""
+        """Källén function for kinematic calculations."""
         return (a**2) + (b**2) + (c**2) - (2*a*b) - (2*a*c) - (2*b*c)
 
     def _integral(self, x_u, x_d, x_l):
@@ -65,9 +63,7 @@ class SterileNeutrino(Neutrino):
         lower = (x_d + x_l) ** 2
         upper = (1 - x_u) ** 2
         
-        # Define the integrand within the method's scope
         def integrand(x):
-            # It can now call self.lam directly
             sqrt_arg = self.lam(x, x_l**2, x_d**2) * self.lam(1, x, x_u**2)
             if sqrt_arg < 0: return 0.0
             return (1 / x) * (x - x_l**2 - x_d**2) * (1 + x_u**2 - x) * np.sqrt(sqrt_arg)
@@ -101,20 +97,43 @@ class SterileNeutrino(Neutrino):
 
         # --- 4. Determine the interaction factor N_w using model helpers ---
         if isinstance(u_particle, Charged_Lepton):
-            if not isinstance(d_particle, LightNeutrino):
-                raise TypeError("For charged current, if u_particle is a ChargedLepton, d_particle must be a LightNeutrino.")
+            raise TypeError("Invalid decay channel: u_particle cannot be a Charged_Lepton in this context.")
+        
+        elif isinstance(u_particle, LightNeutrino) and isinstance(d_particle, Charged_Lepton):
+            # This is the charged current decay N -> l_alpha + nu_beta + l_beta
+            
+            # NEW: Check for lepton family number conservation.
+            # The light neutrino (nu_beta) and its charged partner (l_beta) must form a valid doublet.
+            lepton_doublets = {
+                'nu_e': Electron,
+                'nu_mu': Muon,
+                'nu_tau': Tau
+            }
+            expected_partner = lepton_doublets.get(u_particle.flavor)
+            if not isinstance(d_particle, expected_partner):
+                raise TypeError(
+                    f"Lepton family violation: Neutrino '{u_particle.flavor}' must be paired "
+                    f"with an '{expected_partner.__name__}', but was paired with a "
+                    f"'{d_particle.__class__.__name__}'."
+                )
+
+            # The paper requires that for this formula, alpha != beta.
+            if charged_lepton.__class__ == d_particle.__class__:
+                raise ValueError(
+                    f"Decay channel N -> {charged_lepton.__class__.__name__} + nu + {d_particle.__class__.__name__} "
+                    "is not a pure charged-current process. It involves interference with the "
+                    "neutral current and requires a different formula (see Sec. 3.1.2 of the paper)."
+                )
+            
+            # If all checks pass, the process is valid.
             N_w = 1
-        elif isinstance(u_particle, LightNeutrino):
-            if not isinstance(d_particle, Charged_Lepton):
-                raise TypeError("For charged current, if u_particle is a LightNeutrino, d_particle must be a ChargedLepton.")
-            N_w = 1
-        elif isinstance(u_particle, Quark):
-            if not isinstance(d_particle, Quark):
-                raise TypeError("If u_particle is a Quark, d_particle must also be a Quark.")
+
+        elif isinstance(u_particle, Quark) and isinstance(d_particle, Quark):
+            # This is the charged current decay N -> l_alpha + u + d
             N_c = 3
             N_w = N_c * model.V_ij_for_quark(u_particle, d_particle)**2
         else:
-            raise TypeError("u_particle and d_particle must be instances of Lepton or Quark.")
+            raise TypeError("Invalid combination of outgoing particles for a charged-current decay.")
 
         # --- 5. Calculate the final width using its OWN integral method ---
         integral_val = self._integral(x_u, x_d, x_l)
