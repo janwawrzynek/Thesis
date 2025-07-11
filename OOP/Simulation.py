@@ -1,11 +1,12 @@
 
 from OOP.Particles import Quark, Charged_Lepton, LightNeutrino, SterileNeutrino, Electron, Muon, Tau
 from OOP.Universe import Universe
-
+from OOP.Model_Parameters import ModelParameters
+from OOP.Rel_degrees_of_freedom import RelDegreesOfFreedom
 import numpy as np 
+from pathlib import Path
 pi = np.pi
 exp = np.exp
-import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.special import jv, yv
 import matplotlib.pyplot as plt
@@ -13,30 +14,30 @@ import mpmath
 from scipy.integrate import quad
 from scipy.special import kn, k1
 from scipy.special import zeta
-# Physical constants (natural units: GeV, s^-1)
-M_pl = 2.435e18          # Planck mass [GeV]
-fermi_constant = 1.166e-5           # Fermi constant [GeV^-2]
-m_N = 0.1 # HNL Mass in GeV
-m_a = 1e-6 # ALP mass in GeV
-mixing_parameter_squared = 1e-10 # active-sterile neutrino sector mixing
-f_a = 1e3 # ALP decay constant scenario 1
-mpmath.workdps(50)
-
 
 class Simulation:
 
-    def __init__(self, universe):
+    def __init__(self, universe: Universe,params:ModelParameters, 
+                dof_calculator : RelDegreesOfFreedom):
+        
         # ... (rest of your __init__ method)
 
-        print("Simulation started")
+        #print("Simulation started with", params)
         self.universe = universe
-        self.time = 0
-        self.z_list = np.logspace(-4, 4, num=1000)
-        self.M_pl = 2.435e18  # Planck mass in GeV
-        self.m_N = 0.1 # HNL mass in GeV
-        self.V_ij = np.array([[0.974, 0.225, 0.004], [0.225, 0.973, 0.041], [0.009, 0.04, 0.999]])
-        self.U_matrix = np.array([[10**(-10), 10**(-10), 0], [0, 10**(-10), 0], [0, 0, 10**(-10)]])
+        self.params   = params
+        self.dof_calculator = dof_calculator # <-- STORE THE OBJECT
+        self.time     = 0
+        self.z_list   = np.logspace(-4, 4, num=1000)
 
+        # Pull everything from params instead of hard‑coding:
+        self.M_pl = params.M_pl
+        self.m_N  = params.m_N
+        self.G_F  = params.fermi_constant
+        self.f_a  = params.f_a
+        self.V_ij = self.params.V_ij
+        self.U_matrix = self.params.U_matrix
+
+        
 
     # NEW MASTER FUNCTION FOR KINEMATIC CHECKS
     def check_kinematics(self, incoming_particle, outgoing_particles):
@@ -51,6 +52,8 @@ class Simulation:
             ValueError: If the sum of outgoing masses is greater than or equal
                         to the incoming particle's mass.
         """
+
+    
         # Get the mass of the incoming particle
         m_incoming = incoming_particle.mass
 
@@ -67,39 +70,14 @@ class Simulation:
         # If the check passes, the function simply completes.
 
 
-    
+    # NEW method to get g_star using the provided calculator
     def get_g_star(self, z):
-        if z > 0.1/173.3 and z < 0.1/125.6 :
-            g_star = 106.75 
-
-        elif z > 0.1/125.6 and z < 0.1/91.2 :
-
-            g_star = 96.25
-        elif z> 0.1/91.2 and z <  0.1/80.4:
-            g_star = 95.25
-        elif z> 0.1/80.4 and z < 0.1/4.19:
-            g_star = 92.25
-        elif z> 0.1/4.19 and z < 0.1/1.777 :
-            g_star = 86.25
-        elif z>0.1/1.777 and  z < 0.1/1.29:
-            g_star = 75.75
-        elif z> 0.1/1.29 and z < 0.1/0.214 :
-            g_star = 72.25
-        elif z> 0.1/0.214 and z < 0.1/0.1396:
-            g_star = 61.75
-        elif z> 0.1/0.1396 and z < 0.1/0.135 :
-            g_star = 17.25
-        elif z> 0.1/0.135 and z < 0.1/0.1057 :
-            g_star = 15.25
-        elif z> 0.1/0.1057 and z < 0.1/0.01:
-            g_star = 14.25
-        elif z>0.1/800e-6 and z < 0.1/511e-3:
-            g_star = 10.75
-        elif z < 800e-6:
-            g_star = 3.909
-        
-        return g_star
-    
+        """
+        Calculates the effective number of relativistic degrees of freedom (g_star)
+        by calling the provided calculator object.
+        """
+        return self.dof_calculator.g_star(z)
+   
     
     def entropy_density(self, z):
         g_star = self.get_g_star(z)
@@ -239,9 +217,24 @@ class Simulation:
 
 
 if __name__ == "__main__":
-    universe = Universe()
-    simulation = Simulation(universe)
+    # 1. Define the path to your data file
+    # 1. Build a robust, absolute path to the CSV file.
+    #    This finds the directory of the current script and looks for the CSV there.
+    try:
+        script_dir = Path(__file__).parent
+        csv_file_path = script_dir / "rel_degree_of_Freedom.csv"
+    except NameError:
+        # This fallback is useful for interactive environments like Jupyter
+        csv_file_path = "rel_degree_of_Freedom.csv"
 
+    
+    params     = ModelParameters()    
+    # 3. Create the degrees of freedom calculator object
+    dof_calculator = RelDegreesOfFreedom(csv_path=csv_file_path, m_N=params.m_N)
+  # create the parameters object
+    universe = Universe()
+    simulation = Simulation(universe, params, dof_calculator)
+    
     # Example usage
 
     e = Electron(0.000511)
@@ -257,6 +250,10 @@ if __name__ == "__main__":
     try:
         width = simulation.decay_width_of_sterile_neutrino(sterile_neutrino, e, U, D)
         print(f"Decay width: {width:.6e} GeV")
+
+        # You can also now directly test the g_star function via the simulation object
+        g_star_value = simulation.get_g_star(z=1.0)
+        print(f"g_star at z=1.0 is: {g_star_value:.2f}")
     except ValueError as ex:
         print("Decay not allowed kinematically:")
         print("  ", ex)
