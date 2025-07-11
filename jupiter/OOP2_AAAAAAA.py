@@ -42,7 +42,7 @@ class Particle:
     def __str__(self):
         return f"Particle: {self.alpha, self.mass}" 
     
-
+'''
 class Quark(Particle):
     def __init__(self, flavor):
         super().__init__()
@@ -67,10 +67,41 @@ class Quark(Particle):
 
     def __str__(self):
         return f"Quark: {self.flavor}, Mass: {self.mass}"
+    
+'''
+
+class Quark(Particle):
+    def __init__(self, flavor):
+        # 1) Validate flavor
+        if flavor not in ['up','down','charm','strange','top','bottom']:
+            raise ValueError("…")
+
+        # 2) Look up the correct numerical mass
+        mass_map = {
+            'up':      0.005,
+            'down':    0.003,
+            'charm':   1.3,
+            'strange': 0.1,
+            'top':     174,
+            'bottom':  4.5
+        }
+        mass_value = mass_map[flavor]
+
+        # 3) Now initialize the parent with that mass
+        super().__init__(mass_value)
+
+        # 4) Store your flavor
+        self.flavor = flavor
 
 class Lepton(Particle):
     def __init__(self, mass):
         Particle.__init__(self, mass) 
+
+class Charged_Lepton(Lepton):
+    def __init__(self, mass):
+        super().__init__(mass)
+
+        
 
 class Neutrino(Lepton):
     def __init__(self):
@@ -105,19 +136,19 @@ class SterileNeutrino(Neutrino):
     def __str__(self):
         return f"Quark: {self.flavor}, Mass: {self.mass}"
 
-class Muon(Lepton):
+class Muon(Charged_Lepton):
     def __init__(self, mass):
         super().__init__(mass)
         print("CHECK THE MUON COMPOSITION. SETTING THE MASS TO 0.1056583745 FOR NOW")
         self.mass = 0.106  # Muon mass in GeV
 
-class Electron(Lepton):
+class Electron(Charged_Lepton):
     def __init__(self, mass):
         super().__init__(mass)
         print("CHECK THE ELECTRON COMPOSITION. SETTING THE MASS TO 0.000511 FOR NOW")
         self.mass = 0.0005  # Electron mass in GeV
 
-class Tau(Lepton):
+class Tau(Charged_Lepton):
     def __init__(self, mass):
         super().__init__(mass)
         print("CHECK THE TAU COMPOSITION. SETTING THE MASS TO 1.77686 FOR NOW")
@@ -132,9 +163,9 @@ class Simulation:
         print("Simulation started")
         self.universe = universe
         self.time = 0
-        self.z_list = np.logspace(1e-4, 1e4, num=1000)
-        self.M_pl = 1
-        self.m_N = 0.1
+        self.z_list = np.logspace(-4, 4, num=1000)
+        self.M_pl = 2.435e18  # Planck mass in GeV
+        self.m_N = 0.1 # HNL mass in GeV
         self.V_ij = np.array([[0.974, 0.225, 0.004], [0.225, 0.973, 0.041], [0.009, 0.04, 0.999]])
         self.U_matrix = np.array([[10**(-10), 10**(-10), 0], [0, 10**(-10), 0], [0, 0, 10**(-10)]])
 
@@ -198,7 +229,7 @@ class Simulation:
         up_type_quarks = {'up': 0, 'charm': 1, 'top': 2}  # up, charm, top
         down_type_quarks = {'down': 0, 'strange': 1, 'bottom': 2}  # down, strange, bottom
         
-        # Get quark flavors (assuming your Quark class has a 'flavor' attribute)
+        # Get quark flavors 
         i_flavor = i.flavor.lower()
         j_flavor = j.flavor.lower()
         
@@ -238,7 +269,7 @@ class Simulation:
         return 12 * integral
 
     def get_U_alpha(self, sterile_neutrino, charged_lepton):
-        print("This U matrix is a placeholder!!!")
+        print("This mixing matrix is a placeholder!!!")
         if not isinstance(sterile_neutrino, SterileNeutrino) and ((isinstance(charged_lepton, Tau)) or isinstance(charged_lepton, Muon) or isinstance(charged_lepton, Electron)):
             raise TypeError("Both sterile_neutrino and charged_lepton must be instances of their respective classes.")
         
@@ -268,11 +299,11 @@ class Simulation:
     
     def decay_width_of_sterile_neutrino(self, sterile_neutrino, charged_lepton, u_particle, d_particle):
         # calculate the decay width of a sterile neutrino into a charged lepton and a quark
-        U_alpha = self.get_U_alpha(sterile_neutrino, charged_lepton) # sterile_neutrino.alpha is an electron, f            le.
+        U_alpha = self.get_U_alpha(sterile_neutrino, charged_lepton) 
         # generate_U_matrix needs to be defined! Have a library of mixing angles (e.g. e-e mixing angle, e-mu mixing angle, etc.) 
 
         if isinstance(u_particle, LightNeutrino):
-            print("This is a bodge. Probably better to do this in light neutrino init but that sounds difficult")
+            print("Find better way of implementing this Light Neutrino Mass")
             u_particle.mass = (U_alpha**2) * m_N
 
         x_l = charged_lepton.mass / self.m_N 
@@ -286,19 +317,24 @@ class Simulation:
 
 
         # check type of u_particle (is it a lepton or a quark?)
-        if isinstance(u_particle, Lepton):
-            if not isinstance(d_particle, Lepton):
-                raise TypeError("Both u_particle and d_particle must be instances of the same class (Lepton or Quark).")
+        if isinstance(u_particle, Charged_Lepton):
+            if not isinstance(d_particle, LightNeutrino):
+                raise TypeError("For a charged current if u_particle is a Charged_lepton, d_particle must be a LightNeutrino.")
+            N_w = 1
+
+        elif isinstance(u_particle, LightNeutrino):
+            if not isinstance(d_particle, Charged_Lepton):
+                raise TypeError("For Charged current if u_particle is a LightNeutrino, d_particle must be a Charged_Lepton.")
             N_w = 1
         elif isinstance(u_particle, Quark):
             if not isinstance(d_particle, Quark):
-                raise TypeError("Both u_particle and d_particle must be instances of the same class (Lepton or Quark).")
+                raise TypeError("If u_particle is a Quark, d_particle must also be a Quark.")
             N_c = 3
             N_w = N_c * self.V_ij_for_quark(u_particle, d_particle)**2
         else:
             raise TypeError("u_particle and d_particle must be instances of either the Lepton or Quark class.")
 
-        # G_F = fermi_constant
+        
 
         return N_w * (fermi_constant**2) * (self.m_N**5) / (192 * pi**3) * (U_alpha**2) * self.Integral(x_u, x_d, x_l)
 
@@ -309,14 +345,18 @@ if __name__ == "__main__":
     simulation = Simulation(universe)
 
     # Example usage
+
     e = Electron(0.000511)
+    
+    #U  = Quark('down') 
+    #D  = Quark('up')
     U = LightNeutrino('nu_e')
-    D = Electron(0.000511)  # Using Electron as a placeholder for d_particle
+    D = Electron(0.000511)  
     sterile_neutrino = SterileNeutrino('n1')
 
     # Calculate decay width
     decay_width = simulation.decay_width_of_sterile_neutrino(sterile_neutrino, e, U, D)
-    print(f"Decay width of {sterile_neutrino.flavor} into {U.__class__.__name__} and {e.__class__.__name__}: {decay_width:.6e} GeV")
+    print(f"Decay width of {sterile_neutrino.flavor} into {e.__class__.__name__} and {U.__class__.__name__}  and {D.__class__.__name__}: {decay_width:.6e} GeV")
 
 
 

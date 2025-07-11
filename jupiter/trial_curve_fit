@@ -1,0 +1,79 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.special import kn
+from scipy.optimize import curve_fit
+
+# Physical constants (natural units: GeV, s^-1)
+M_pl = 2.435e18          # Planck mass [GeV]
+fermi_constant = 1.166e-5  # Fermi constant [GeV^-2]
+# Fixed masses and mixing
+m_N = 0.1    # HNL Mass in GeV
+m_a = 1e-6   # ALP mass in GeV
+mixing_param_sq = 1e-10
+m_nu = mixing_param_sq * m_N
+
+# Test function to fit: gamma(z) = decay_width_a_vv * K1(z)/K2(z)
+# We fit only f_a (ALP decay constant) as free parameter
+
+def gamma_a_vv_over_eq(z, f_a):
+    # decay width for a -> nu nu
+    factor = (1 / (2 * np.pi * f_a**2)) * m_N**2 * m_a * (mixing_param_sq**2)
+    kinematic = np.sqrt(1 - (4 * m_nu**2) / m_a**2) * (1 - (2 * m_nu**2) / m_a**2)
+    return factor * kinematic * (kn(1, z) / kn(2, z))
+
+# Data points to fit
+x_data = np.array([1e-4, 0.2,1,100,1000,10000,100000,1e6,1e7,1e8])
+y_data = np.array([1e-45,1e-42,1e-41,1e-40,1e-38,1e-37,1e-36,1e-35,1e-35,1e-35])
+
+# Remove z=0 point (kn diverges at z=0)
+mask = x_data > 0
+x_fit = x_data[mask]
+y_fit = y_data[mask]
+
+# Initial guess for f_a (in GeV)
+p0 = [1e3]
+
+# Perform the curve fit
+popt, pcov = curve_fit(gamma_a_vv_over_eq, x_fit, y_fit, p0=p0)
+
+fitted_f_a = popt[0]
+fitted_err = np.sqrt(np.diag(pcov))[0]
+print(f"Fitted f_a = {fitted_f_a:.2e} \u00B1 {fitted_err:.2e} GeV")
+
+# Plot data and fit
+z_plot = np.logspace(-3, 1, 200)
+plt.loglog(x_data, y_data, 'o', label='Data')
+plt.loglog(z_plot, gamma_a_vv_over_eq(z_plot, fitted_f_a), '-', label=f'Fit (f_a={fitted_f_a:.1e} GeV)')
+plt.xlabel('z = m_N / T')
+plt.ylabel(r'$\gamma_{a\to\nu\nu} / n_a^{eq}$')
+plt.legend()
+plt.show()
+
+    if z > 0.1/173.3 and z < 125.6 :
+        g_star = 106.75 
+
+    elif z > 0.1/125.6 and z < 91.2 :
+
+      g_star = 96.25
+    elif z> 0.1/91.2 and z <  80.4:
+        g_star = 95.25
+    elif z> 0.1/80.4 and z < 4.19:
+        g_star = 92.25
+    elif z> 0.1/4.19 and z < 0.1/1.777 :
+        g_star = 86.25
+    elif z>0.1/1.777 and  z < 0.1/1.29:
+        g_star = 75.75
+    elif z> 0.1/1.29 and z < 0.1/0.214 :
+        g_star = 72.25
+    elif z> 0.1/0.214 and z < 0.1/0.1396:
+        g_star = 61.75
+    elif z> 0.1/0.1396 and z < 0.1/0.135 :
+        g_star = 17.25
+    elif z> 0.1/0.135 and z < 0.1/0.1057 :
+        g_star = 15.25
+    elif z> 0.1/0.1057 and z < 0.1/0.01:
+        g_star = 14.25
+    elif z>0.1/800e-6 and z < 0.1/511e-3:
+        g_star = 10.75
+    elif z < 800e-6:
+        g_star = 3.909
